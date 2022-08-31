@@ -1,0 +1,21 @@
+{% extends 'base.html'%}
+  {% block title%}
+    Интересное{{ title }}
+  {% endblock %}
+{% block content %}
+<main>
+  <div class="container py-5">     
+    <h1>Интересное</h1>
+    {% include 'posts/includes/switcher.html' %}
+    {% load cache %}
+    {% cache 20 index_page %}
+    {% for post in page_obj %}
+    {% include 'posts/includes/article.html' with show_group_link=True show_author_link=True %}
+    {% endfor %}
+    {% endcache %} 
+  </div>
+  <div>
+    {% include 'posts/includes/paginator.html' %} 
+  </div>
+</main>
+{% endblock %}

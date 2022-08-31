@@ -1,0 +1,18 @@
+{% extends 'base.html'%}
+  {% block title%}
+    Главная страница{{ title }}
+  {% endblock %}
+{% block content %}
+<main>
+  <div class="container py-5">     
+    <h1>Это главная страница проекта Yatube</h1>
+    {% include 'posts/includes/switcher.html' %}
+    {% for post in page_obj %}
+    {% include 'posts/includes/article.html' with show_group_link=True show_author_link=True %}
+    {% endfor %}
+  </div>
+  <div>
+    {% include 'posts/includes/paginator.html' %} 
+  </div>
+</main>
+{% endblock %}

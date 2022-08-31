@@ -1,0 +1,45 @@
+{% load thumbnail %}
+<article>
+<ul>
+  <li>
+    Автор: {{ post.author.get_full_name }}
+  </li>
+  <li>
+    Дата публикации: {{ post.pub_date|date:"d E Y" }}
+  </li>
+</ul>
+<div class="d-inline-flex p-2">
+  {% thumbnail post.image "480x270" crop="center" upscale=True as im %}
+    <img class="img-thumbnail" style="margin-right: 20px" src="{{ im.url }}">
+  {% endthumbnail %}
+  <p class="text-justify">{{ post.text|linebreaksbr  }}</p>
+</div>
+<div class="d-flex justify-content-around" style="max-width: 70%">
+  <p>
+  {% if post.group and show_group_link %}
+    <a href="{% url 'posts:group_list' post.group.slug %}">
+      <button type="button" class="btn btn-outline-primary">
+        все записи группы
+      </button>
+    </a>
+  {% endif %}
+  </p>
+  <p>
+  {% if post.author and show_author_link %}
+    <a  href="{% url 'posts:profile' post.author %}">
+      <button type="button" class="btn btn-outline-primary">  
+        все посты пользователя
+      </button>
+    </a>
+  {% endif %}
+  </p>
+  <p>
+    <a href="{% url 'posts:post_detail' post.pk %}">
+      <button type="button" class="btn btn-outline-primary">
+        подробная информация
+      </button>
+    </a>
+  </p>
+</div>
+  {% if not forloop.last %}<hr>{% endif %}
+</article>

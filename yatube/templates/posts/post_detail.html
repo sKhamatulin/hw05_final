@@ -1,0 +1,51 @@
+{% extends 'base.html'%}
+  {% block title%}
+  {{ post|truncatechars:30 }}
+  {% endblock %}
+{% load thumbnail %}
+{% block content %}
+    <div class="row">
+      <aside class="col-12 col-md-3">
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">
+            Дата публикации: {{ post.pub_date|date:"d E Y" }} 
+          </li>
+            {% if post.group %}  
+          <li class="list-group-item">
+            Группа: {{ post.group }}
+            <a href="{% url 'posts:group_list' post.group.slug %}">
+              все записи группы
+            </a>
+          </li>
+            {% endif %}
+          <li class="list-group-item">
+            Автор: {{ author }}
+          </li>
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            Всего постов автора:  <span >{{ count }}</span>
+          </li>
+          <li class="list-group-item">
+            <a href="{% url 'posts:profile' post.author %}">
+              все посты пользователя
+            </a>
+          </li>
+        </ul>
+      </aside>
+        <article class="col-12 col-md-9">
+        <div class="d-inline-flex p-2">
+          {% thumbnail post.image "480x270" crop="center" upscale=True as im %}
+            <img class="img-thumbnail" style="margin-right: 20px" src="{{ im.url }}">
+          {% endthumbnail %}
+          <p>
+          {{ post.text|linebreaksbr  }}
+          </p>
+        </div>
+          {% if post.author == request.user %}
+          <a class="btn btn-primary" style="margin-bottom: 10px" href={% url 'posts:post_edit' post.pk %}>
+            редактировать запись
+          </a>
+          {% endif %}
+          {% include 'posts/includes/add_comment.html' %}
+        </article>
+    </div> 
+{% endblock %}
