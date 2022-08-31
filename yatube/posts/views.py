@@ -43,7 +43,7 @@ def profile(request, username):
             user=request.user,
             author=author
         ).exists()
-    else: 
+    else:
         following = False
     context = {
         'author': author,
