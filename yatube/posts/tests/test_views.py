@@ -93,15 +93,14 @@ class PostsViewTest(TestCase):
         """юзер подписывается и отписываются от автора"""
         count = Follow.objects.count()
         self.authorized_follower.get(reverse('posts:profile_follow',
-                                           kwargs=self.kw_user))
+                                             kwargs=self.kw_user))
         self.assertEqual(Follow.objects.count(), count + 1)
         self.authorized_follower.get(reverse('posts:profile_unfollow',
-                                               kwargs=self.kw_user))
+                                             kwargs=self.kw_user))
         self.assertEqual(Follow.objects.count(), 0)
 
-
     def test_page_follow(self):
-        """на странице fallow появляются 
+        """на странице fallow появляются
         посты авторов на которых подписан юзер"""
         Follow.objects.create(user=self.follower,
                               author=self.user)
@@ -111,14 +110,14 @@ class PostsViewTest(TestCase):
         self.check_obj_by_id(obj, obj_in_context)
 
     def test_page_follow_not_equal(self):
-        """на странице fallow не появляются 
+        """на странице fallow не появляются
         посты авторов на которых не подписан юзер"""
         Follow.objects.create(user=self.follower,
                               author=self.user)
         response = self.authorized_client.get('/follow/')
         obj_in_context = response.context['page_obj']
         self.assertEqual(len(obj_in_context), 0)
-        
+
     def test_pages_uses_correct_template(self):
         """ожидаемые шаблоны"""
         cache.clear()
