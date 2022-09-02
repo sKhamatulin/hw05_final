@@ -1,7 +1,6 @@
 import shutil
 import tempfile
 from http import HTTPStatus
-from tkinter import N
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -102,7 +101,7 @@ class PostsViewTest(TestCase):
         self.authorized_follower.get(reverse('posts:profile_follow',
                                              kwargs=self.kw_user))
         self.assertEqual(Follow.objects.count(), count + 1)
-    
+
     def test_unfollowing(self):
         """юзер подписывается и отписывается от автора"""
         count = Follow.objects.count()
@@ -228,7 +227,7 @@ class PostsViewTest(TestCase):
             with self.subTest(value=value):
                 form_field = response.context.get('form').fields.get(value)
                 self.assertIsInstance(form_field, expected)
-    
+
     def test_cache_index_page(self):
         """тест каэша на странице"""
         post_for_cache = Post.objects.create(
