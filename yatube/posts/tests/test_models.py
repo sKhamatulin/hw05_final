@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from ..models import Group, Post
+from ..models import Group, Post, LINE_SLICE
 
 User = get_user_model()
 
@@ -29,4 +29,4 @@ class PostModelTest(TestCase):
 
         post = PostModelTest.post
         verbose = post.__str__()
-        self.assertEqual(verbose, self.post.text[:15])
+        self.assertEqual(verbose, self.post.text[:LINE_SLICE])

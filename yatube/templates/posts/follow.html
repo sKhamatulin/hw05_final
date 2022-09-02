@@ -6,13 +6,10 @@
 <main>
   <div class="container py-5">     
     <h1>Интересное</h1>
-    {% include 'posts/includes/switcher.html' %}
-    {% load cache %}
-    {% cache 20 index_page %}
+    {% include 'posts/includes/switcher.html' with follow=True %}
     {% for post in page_obj %}
     {% include 'posts/includes/article.html' with show_group_link=True show_author_link=True %}
     {% endfor %}
-    {% endcache %} 
   </div>
   <div>
     {% include 'posts/includes/paginator.html' %} 

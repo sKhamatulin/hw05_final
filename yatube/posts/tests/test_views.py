@@ -1,6 +1,7 @@
 import shutil
 import tempfile
 from http import HTTPStatus
+from tkinter import N
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -11,7 +12,8 @@ from django import forms
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 
-from posts.models import Post, Group, Follow
+from posts.models import Post, Group, Follow, Comment
+from posts.utils import NUM_POST_ON_THE_PAGE
 
 User = get_user_model()
 
@@ -25,7 +27,7 @@ class PostsViewTest(TestCase):
         super(PostsViewTest, cls).setUpClass()
 
         cls.user = User.objects.create_user(username='auth')
-        cls.follower = User.objects.create_user('fallower')
+        cls.follower = User.objects.create_user('follower')
         # первая группа
         cls.group = Group.objects.create(
             title='Тестовая группа',
@@ -66,6 +68,15 @@ class PostsViewTest(TestCase):
             group=cls.group2,
             image=cls.uploaded,
         )
+        cls.kw_id = {'post_id': cls.post.id}
+        cls.kw_user = {'username': cls.user.username}
+        cls.kw_slug = {'slug': cls.group.slug}
+        cls.kw_slug2 = {'slug': cls.group2.slug}
+
+        cls.form_fields = {
+            'text': forms.fields.CharField,
+            'group': forms.fields.ChoiceField
+        }
 
     @classmethod
     def tearDownClass(cls):
@@ -84,13 +95,16 @@ class PostsViewTest(TestCase):
         self.authorized_follower = Client()
         self.authorized_client.force_login(self.user)
         self.authorized_follower.force_login(self.follower)
-        self.kw_id = {'post_id': self.post.id}
-        self.kw_user = {'username': self.user.username}
-        self.kw_slug = {'slug': self.group.slug}
-        self.kw_slug2 = {'slug': self.group2.slug}
 
-    def test_fallowing(self):
-        """юзер подписывается и отписываются от автора"""
+    def test_following(self):
+        """юзер подписывается на автора"""
+        count = Follow.objects.count()
+        self.authorized_follower.get(reverse('posts:profile_follow',
+                                             kwargs=self.kw_user))
+        self.assertEqual(Follow.objects.count(), count + 1)
+    
+    def test_unfollowing(self):
+        """юзер подписывается и отписывается от автора"""
         count = Follow.objects.count()
         self.authorized_follower.get(reverse('posts:profile_follow',
                                              kwargs=self.kw_user))
@@ -100,7 +114,7 @@ class PostsViewTest(TestCase):
         self.assertEqual(Follow.objects.count(), 0)
 
     def test_page_follow(self):
-        """на странице fallow появляются
+        """на странице follow появляются
         посты авторов на которых подписан юзер"""
         Follow.objects.create(user=self.follower,
                               author=self.user)
@@ -110,7 +124,7 @@ class PostsViewTest(TestCase):
         self.check_obj_by_id(obj, obj_in_context)
 
     def test_page_follow_not_equal(self):
-        """на странице fallow не появляются
+        """на странице follow не появляются
         посты авторов на которых не подписан юзер"""
         Follow.objects.create(user=self.follower,
                               author=self.user)
@@ -181,18 +195,27 @@ class PostsViewTest(TestCase):
 
     def test_create_post(self):
         """Комментарий оставляет авторизованный пользователь"""
+        Comment.objects.create(post=self.post,
+                               author=self.user,
+                               text='Тестовый коммент')
         response = self.authorized_client.get(reverse('posts:add_comment',
                                                       kwargs=self.kw_id))
+        obj = get_object_or_404(Comment)
         self.assertEqual(response.status_code, HTTPStatus.FOUND)
+        self.assertEqual(obj.text, 'Тестовый коммент')
+
+    def test_create_post(self):
+        """Комментарий оставляет не авторизованный пользователь"""
+        with self.assertRaises(ValueError):
+            comment = Comment.objects.create(post=self.post,
+                                             author=self.client,
+                                             text='Тестовый коммент')
+            self.assertEqual(comment, None)
 
     def test_create_page_show_correct_context(self):
         """ожидаемая форма для create"""
         response = self.authorized_client.get(reverse('posts:post_create'))
-        form_fields = {
-            'text': forms.fields.CharField,
-            'group': forms.fields.ChoiceField
-        }
-        for value, expected in form_fields.items():
+        for value, expected in self.form_fields.items():
             with self.subTest(value=value):
                 form_field = response.context.get('form').fields.get(value)
                 self.assertIsInstance(form_field, expected)
@@ -201,14 +224,26 @@ class PostsViewTest(TestCase):
         """ожидаемая форма для edit"""
         response = self.authorized_client.get(reverse('posts:post_edit',
                                                       kwargs=self.kw_id))
-        form_fields = {
-            'text': forms.fields.CharField,
-            'group': forms.fields.ChoiceField
-        }
-        for value, expected in form_fields.items():
+        for value, expected in self.form_fields.items():
             with self.subTest(value=value):
                 form_field = response.context.get('form').fields.get(value)
                 self.assertIsInstance(form_field, expected)
+    
+    def test_cache_index_page(self):
+        """тест каэша на странице"""
+        post_for_cache = Post.objects.create(
+            author=self.user,
+            group=self.group,
+            text='Тестовый пост для проверки кэша'
+        )
+        response = self.authorized_client.get(reverse('posts:index'))
+        post_for_cache.delete()
+        response_cached = self.authorized_client.get(reverse('posts:index'))
+        cache.clear()
+        response_cleared = self.authorized_client.get(reverse('posts:index'))
+
+        self.assertEqual(response.content, response_cached.content)
+        self.assertNotEqual(response_cached.content, response_cleared.content)
 
 
 class PaginatorViewsTest(TestCase):
@@ -221,47 +256,45 @@ class PaginatorViewsTest(TestCase):
             slug='test_slug',
             description='Тестовое описание',
         )
-        for i in range(0, 13, 1):
-            cls.post = Post.objects.create(
-                text=f'Тестовая пост номер {i}',
+        cls.NUM_POST_FOR_TESTS = NUM_POST_ON_THE_PAGE + 3
+        cls.NUM_POST_ON_THE_SECOND_PAGE = (cls.NUM_POST_FOR_TESTS
+                                           % NUM_POST_ON_THE_PAGE)
+        cls.kw_user = {'username': cls.user.username}
+        cls.kw_slug = {'slug': cls.group.slug}
+
+        posts = [
+            Post(
                 author=cls.user,
-                group=cls.group)
+                text=f'Тестовая пост номер {i}',
+                group=cls.group,
+            ) for i in range(0, cls.NUM_POST_FOR_TESTS, 1)
+        ]
+        Post.objects.bulk_create(posts)
 
-    def setUp(self):
-        self.kw_user = {'username': self.user.username}
-        self.kw_slug = {'slug': self.group.slug}
-
-    def test_first_page_index_contains_ten_records(self):
-        """на первой странице index 10 постов"""
+    def test_first_pages_paginator(self):
+        """на первых страницах 10 постов"""
         cache.clear()
-        response = self.client.get(reverse('posts:index'))
-        self.assertEqual(len(response.context['page_obj']), 10)
+        response_first_pages = [
+            self.client.get(reverse('posts:index')),
+            self.client.get(reverse('posts:group_list',
+                            kwargs=self.kw_slug)),
+            self.client.get(reverse('posts:profile',
+                            kwargs=self.kw_user))
+        ]
+        for response in response_first_pages:
+            self.assertEqual(len(response.context['page_obj']),
+                             NUM_POST_ON_THE_PAGE)
 
-    def test_second_page_index_contains_three_records(self):
-        """на второй странице index 3 поста"""
-        response = self.client.get(reverse('posts:index') + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 3)
-
-    def test_first_page_group_list_contains_ten_records(self):
-        """на первой странице group list 10 постов"""
-        response = self.client.get(reverse('posts:group_list',
-                                           kwargs=self.kw_slug))
-        self.assertEqual(len(response.context['page_obj']), 10)
-
-    def test_second_page_group_list_contains_three_records(self):
-        """на второй странице group list 3 поста"""
-        response = self.client.get(reverse('posts:group_list',
-                                           kwargs=self.kw_slug) + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 3)
-
-    def test_first_page_profile_contains_ten_records(self):
-        """на первой странице profile list 10 постов"""
-        response = self.client.get(reverse('posts:profile',
-                                           kwargs=self.kw_user))
-        self.assertEqual(len(response.context['page_obj']), 10)
-
-    def test_second_page_profile_contains_three_records(self):
-        """на второй странице profile list 3 поста"""
-        response = self.client.get(reverse('posts:profile',
-                                           kwargs=self.kw_user) + '?page=2')
-        self.assertEqual(len(response.context['page_obj']), 3)
+    def test_second_pages_paginator(self):
+        """на вторых страницах 3 поста"""
+        cache.clear()
+        response_first_pages = [
+            self.client.get(reverse('posts:index') + '?page=2'),
+            self.client.get(reverse('posts:group_list',
+                            kwargs=self.kw_slug) + '?page=2'),
+            self.client.get(reverse('posts:profile',
+                            kwargs=self.kw_user) + '?page=2')
+        ]
+        for response in response_first_pages:
+            self.assertEqual(len(response.context['page_obj']),
+                             self.NUM_POST_ON_THE_SECOND_PAGE)

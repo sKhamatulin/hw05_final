@@ -6,13 +6,11 @@ from .models import Group, Post, User, Comment, Follow
 from .forms import PostForm, CommentForm
 from .utils import get_post_obj
 
-NUMBER_OF_DISPLAYED_ITEMS = 10
-
 
 @cache_page(20, key_prefix='index_page')
 def index(request):
     template = 'posts/index.html'
-    post_list = Post.objects.all()
+    post_list = Post.objects.select_related('group', 'author')
     page_obj = get_post_obj(request, post_list)
     context = {
         'page_obj': page_obj,
@@ -35,8 +33,7 @@ def group_posts(request, slug):
 def profile(request, username):
     template = 'posts/profile.html'
     author = get_object_or_404(User, username=username)
-    post_list = author.posts.all()
-    count = Post.objects.filter(author=author).count()
+    post_list = Post.objects.select_related('group')
     page_obj = get_post_obj(request, post_list)
     if request.user.is_authenticated:
         following = Follow.objects.filter(
@@ -48,7 +45,6 @@ def profile(request, username):
     context = {
         'author': author,
         'page_obj': page_obj,
-        'count': count,
         'following': following,
     }
     return render(request, template, context)
@@ -57,12 +53,10 @@ def profile(request, username):
 def post_detail(request, post_id):
     template = 'posts/post_detail.html'
     post = get_object_or_404(Post, pk=post_id)
-    author = post.author.get_full_name()
     form = CommentForm()
-    comments = Comment.objects.filter(post_id=post_id)
+    comments = Comment.objects.select_related('post')
     context = {
         'post': post,
-        'author': author,
         'form': form,
         'comments': comments,
     }
