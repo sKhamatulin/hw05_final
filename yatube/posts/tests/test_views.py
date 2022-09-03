@@ -1,6 +1,5 @@
 import shutil
 import tempfile
-from http import HTTPStatus
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -101,16 +100,17 @@ class PostsViewTest(TestCase):
         self.authorized_follower.get(reverse('posts:profile_follow',
                                              kwargs=self.kw_user))
         self.assertEqual(Follow.objects.count(), count + 1)
+        # self.assertEqual(Follow.user, self.authorized_client)
 
     def test_unfollowing(self):
         """юзер подписывается и отписывается от автора"""
-        count = Follow.objects.count()
-        self.authorized_follower.get(reverse('posts:profile_follow',
-                                             kwargs=self.kw_user))
-        self.assertEqual(Follow.objects.count(), count + 1)
+        Follow.objects.create(
+            user=self.follower,
+            author=self.user,
+        )
         self.authorized_follower.get(reverse('posts:profile_unfollow',
                                              kwargs=self.kw_user))
-        self.assertEqual(Follow.objects.count(), 0)
+        self.assertEqual(list(Follow.objects.filter(user=self.follower)), [])
 
     def test_page_follow(self):
         """на странице follow появляются
@@ -192,24 +192,22 @@ class PostsViewTest(TestCase):
         obj_in_context = response.context.get('post')
         self.check_obj_by_id(obj, obj_in_context)
 
-    def test_create_post(self):
+    def test_add_comment_authorized_client(self):
         """Комментарий оставляет авторизованный пользователь"""
-        Comment.objects.create(post=self.post,
-                               author=self.user,
-                               text='Тестовый коммент')
-        response = self.authorized_client.get(reverse('posts:add_comment',
-                                                      kwargs=self.kw_id))
+        self.authorized_client.post(
+            reverse('posts:add_comment', kwargs=self.kw_id),
+            data={'text': 'Тестовый коммент'},
+            follow=True
+        )
         obj = get_object_or_404(Comment)
-        self.assertEqual(response.status_code, HTTPStatus.FOUND)
         self.assertEqual(obj.text, 'Тестовый коммент')
 
-    def test_create_post(self):
+    def test_add_comment_only_for_authorized_uses(self):
         """Комментарий оставляет не авторизованный пользователь"""
-        with self.assertRaises(ValueError):
-            comment = Comment.objects.create(post=self.post,
-                                             author=self.client,
-                                             text='Тестовый коммент')
-            self.assertEqual(comment, None)
+        response = self.client.get(
+            reverse("posts:add_comment", kwargs=self.kw_id))
+        redirect_url = '/auth/login/?next=/posts/1/comment/'
+        self.assertRedirects(response, redirect_url)
 
     def test_create_page_show_correct_context(self):
         """ожидаемая форма для create"""
@@ -255,9 +253,9 @@ class PaginatorViewsTest(TestCase):
             slug='test_slug',
             description='Тестовое описание',
         )
-        cls.NUM_POST_FOR_TESTS = NUM_POST_ON_THE_PAGE + 3
-        cls.NUM_POST_ON_THE_SECOND_PAGE = (cls.NUM_POST_FOR_TESTS
-                                           % NUM_POST_ON_THE_PAGE)
+        cls.NUM_POST_ON_THE_OVER_PAGE = NUM_POST_ON_THE_PAGE // 2
+        cls.NUM_POST_FOR_TESTS = (NUM_POST_ON_THE_PAGE
+                                  + cls.NUM_POST_ON_THE_OVER_PAGE)
         cls.kw_user = {'username': cls.user.username}
         cls.kw_slug = {'slug': cls.group.slug}
 
@@ -266,7 +264,7 @@ class PaginatorViewsTest(TestCase):
                 author=cls.user,
                 text=f'Тестовая пост номер {i}',
                 group=cls.group,
-            ) for i in range(0, cls.NUM_POST_FOR_TESTS, 1)
+            ) for i in range(cls.NUM_POST_FOR_TESTS)
         ]
         Post.objects.bulk_create(posts)
 
@@ -296,4 +294,4 @@ class PaginatorViewsTest(TestCase):
         ]
         for response in response_first_pages:
             self.assertEqual(len(response.context['page_obj']),
-                             self.NUM_POST_ON_THE_SECOND_PAGE)
+                             self.NUM_POST_ON_THE_OVER_PAGE)

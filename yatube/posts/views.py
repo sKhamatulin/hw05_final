@@ -33,7 +33,7 @@ def group_posts(request, slug):
 def profile(request, username):
     template = 'posts/profile.html'
     author = get_object_or_404(User, username=username)
-    post_list = Post.objects.filter(author=author)
+    post_list = author.posts.select_related('author')
     page_obj = get_post_obj(request, post_list)
     if request.user.is_authenticated:
         following = Follow.objects.filter(
@@ -54,11 +54,12 @@ def post_detail(request, post_id):
     template = 'posts/post_detail.html'
     post = get_object_or_404(Post, pk=post_id)
     form = CommentForm()
-    comments = Comment.objects.select_related('post')
+    comments = Comment.objects.filter(post_id=post.id).select_related('author')
     context = {
         'post': post,
         'form': form,
         'comments': comments,
+        'author': post.author
     }
     return render(request, template, context)
 
