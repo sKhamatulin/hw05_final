@@ -100,7 +100,8 @@ class PostsViewTest(TestCase):
         self.authorized_follower.get(reverse('posts:profile_follow',
                                              kwargs=self.kw_user))
         self.assertEqual(Follow.objects.count(), count + 1)
-        # self.assertEqual(Follow.user, self.authorized_client)
+        self.assertTrue(Follow.objects.filter(user=self.follower,
+                                              author=self.user).exists())
 
     def test_unfollowing(self):
         """юзер подписывается и отписывается от автора"""
@@ -110,7 +111,8 @@ class PostsViewTest(TestCase):
         )
         self.authorized_follower.get(reverse('posts:profile_unfollow',
                                              kwargs=self.kw_user))
-        self.assertEqual(list(Follow.objects.filter(user=self.follower)), [])
+        self.assertFalse(Follow.objects.filter(user=self.follower,
+                                               author=self.user).exists())
 
     def test_page_follow(self):
         """на странице follow появляются
@@ -194,13 +196,14 @@ class PostsViewTest(TestCase):
 
     def test_add_comment_authorized_client(self):
         """Комментарий оставляет авторизованный пользователь"""
+        count = Comment.objects.count()
         self.authorized_client.post(
             reverse('posts:add_comment', kwargs=self.kw_id),
             data={'text': 'Тестовый коммент'},
             follow=True
         )
-        obj = get_object_or_404(Comment)
-        self.assertEqual(obj.text, 'Тестовый коммент')
+        self.assertEqual(Comment.objects.filter(post=self.post.id).count(),
+                         count + 1)
 
     def test_add_comment_unauthorized_client(self):
         """Комментарий оставляет авторизованный пользователь"""

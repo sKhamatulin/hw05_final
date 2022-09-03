@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.cache import cache_page
 
-from .models import Group, Post, User, Comment, Follow
+from .models import Group, Post, User, Follow
 from .forms import PostForm, CommentForm
 from .utils import get_post_obj
 
@@ -54,7 +54,7 @@ def post_detail(request, post_id):
     template = 'posts/post_detail.html'
     post = get_object_or_404(Post, pk=post_id)
     form = CommentForm()
-    comments = Comment.objects.filter(post_id=post.id).select_related('author')
+    comments = post.comments.all()
     context = {
         'post': post,
         'form': form,
