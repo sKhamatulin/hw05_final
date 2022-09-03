@@ -202,12 +202,15 @@ class PostsViewTest(TestCase):
         obj = get_object_or_404(Comment)
         self.assertEqual(obj.text, 'Тестовый коммент')
 
-    def test_add_comment_only_for_authorized_uses(self):
-        """Комментарий оставляет не авторизованный пользователь"""
-        response = self.client.get(
-            reverse("posts:add_comment", kwargs=self.kw_id))
-        redirect_url = '/auth/login/?next=/posts/1/comment/'
-        self.assertRedirects(response, redirect_url)
+    def test_add_comment_unauthorized_client(self):
+        """Комментарий оставляет авторизованный пользователь"""
+        count = Comment.objects.count()
+        self.client.post(
+            reverse('posts:add_comment', kwargs=self.kw_id),
+            data={'text': 'Тестовый коммент'},
+            follow=True
+        )
+        self.assertEqual(Comment.objects.count(), count)
 
     def test_create_page_show_correct_context(self):
         """ожидаемая форма для create"""
